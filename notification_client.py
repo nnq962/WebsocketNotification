@@ -9,9 +9,14 @@ import queue
 from gtts import gTTS
 import subprocess
 from utils.logger_config import LOGGER
+import sys
 
+# Đường dẫn đến file cấu hình
+CONFIG_FILE = "main_config.json"
+
+# Cấu hình mặc định
 DEFAULT_HOST = '192.168.1.142'
-DEFAULT_PORT = 9999
+DEFAULT_PORT = 9624
 
 class NotificationClient:
     def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, reconnect_interval=5):
@@ -548,12 +553,34 @@ def run_client(host=DEFAULT_HOST, port=DEFAULT_PORT):
         client.stop()
 
 if __name__ == "__main__":
-    # Thiết lập parser tham số dòng lệnh
+    # Thiết lập parser tham số dòng lệnh - chỉ nhận một tham số config
     parser = argparse.ArgumentParser(description='Notification Client')
-    parser.add_argument('--host', type=str, default=DEFAULT_HOST, help=f'Server host address (default: {DEFAULT_HOST})')
-    parser.add_argument('--port', type=int, default=DEFAULT_PORT, help=f'Server port (default: {DEFAULT_PORT})')
+    parser.add_argument('--config', type=str, required=True, help='Configuration profile to use (e.g., 3HINC, EDULIVE)')
     
     args = parser.parse_args()
+    config_name = args.config
     
-    # Khởi động client với các tham số từ dòng lệnh
-    run_client(host=args.host, port=args.port)
+    # Đọc file cấu hình
+    try:
+        with open(CONFIG_FILE, 'r') as file:
+            all_configs = json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        LOGGER.error(f"Error loading config file: {e}")
+        sys.exit(1)
+    
+    # Kiểm tra xem config được chỉ định có tồn tại không
+    if config_name not in all_configs:
+        LOGGER.error(f"Configuration '{config_name}' not found in {CONFIG_FILE}")
+        LOGGER.error(f"Available configurations: {', '.join(all_configs.keys())}")
+        sys.exit(1)
+    
+    # Lấy cấu hình từ file
+    config = all_configs[config_name]
+    host = config.get("host", DEFAULT_HOST)
+    port = config.get("noti_port", DEFAULT_PORT)
+    
+    LOGGER.info(f"Loaded configuration for '{config_name}'")
+    LOGGER.info(f"Host: {host}, Port: {port}")
+    
+    # Khởi động client
+    run_client(host=host, port=port)
